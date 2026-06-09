@@ -15,7 +15,7 @@ jobs:
       - name: Descargar Código Fuente
         uses: actions/checkout@v4
 
-      # 2. Configurar Node.js para Capacitor (Actualizado a v22)
+      # 2. Configurar Node.js para Capacitor
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,12 +27,12 @@ jobs:
           npm install
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      # 4. Instalar Java (obligatorio para compilar Android)
-      - name: Configurar Java JDK 17
+      # 4. Instalar Java (Actualizado a JDK 21 para compatibilidad nativa)
+      - name: Configurar Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       # 5. Construir el cascarón de Android de Capacitor otorgando permisos previos
       - name: Inicializar Plataforma Android
