@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Control de Asistencia de IDA</title>
+    <style>
+        /* Bloqueo absoluto de scrollbars y rebote nativo */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Ocultación total de barras de desplazamiento */
+        *::-webkit-scrollbar {
+            display: none !important;
+        }
+        * {
+            -ms-overflow-style: none !important;
+            scrollbar-width: none !important;
+        }
+
+        html, body {
+            height: 100vh;
+            height: 100dvh; /* Altura dinámica real en celulares */
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #212529;
+            padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ENCABEZADO MAXIMIZADO CON NAVEGACIÓN */
+        header {
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .app-subletra {
+            font-size: 1.35rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #1b2a4a;
+            line-height: 1.1;
+        }
+
+        .empresa-titulo {
+            font-size: 2.3rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, #1b2a4a 0%, #007bff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+            margin: 2px 0;
+        }
+
+        /* Controles de navegación de meses */
+        .navegador-meses {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+            background: #e9ecef;
+            border-radius: 20px;
+            padding: 2px 8px;
+        }
+
+        .btn-nav {
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #007bff;
+            cursor: pointer;
+            padding: 2px 10px;
+        }
+        
+        .btn-nav:active {
+            opacity: 0.5;
+        }
+
+        .mes-titulo {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        /* Contenedor del Calendario */
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            background: white;
+            padding: 6px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        }
+
+        .grid-7 {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+        }
+
+        /* Días de la semana */
+        .dia-semana {
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.65rem;
+            padding: 5px 0;
+            background-color: #e9ecef;
+            color: #495057;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .dia-semana.domingo-ui {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .cell-vacia {
+            visibility: hidden;
+        }
+
+        /* Celdas del calendario */
+        .cell-dia {
+            aspect-ratio: 1 / 1;
+            background-color: #fdfdfd;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cell-dia:active {
+            background-color: #f1f3f5;
+        }
+
+        .cell-dia.es-hoy {
+            border: 2px solid #007bff !important;
+            background-color: #f1f7ff;
+        }
+
+        .num-dia {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        
+        .cell-dia.es-hoy .num-dia {
+            color: #007bff;
+            font-weight: 800;
+        }
+
+        .marcador-celda {
+            font-size: 1.05rem;
+            font-weight: 800;
+            text-align: center;
+            color: #212529;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cell-dia.es-domingo {
+            background-color: #fff5f5;
+            border-color: #ffe3e3;
+        }
+        .cell-dia.es-domingo .num-dia,
+        .cell-dia.es-domingo .marcador-celda {
+            color: #dc3545;
+        }
+
+        .cell-dia.es-feriado {
+            background-color: #fff9db !important;
+            border-color: #ffe066 !important;
+        }
+        .cell-dia.es-feriado .marcador-celda {
+            color: #dc3545 !important; 
+        }
+
+        /* Fila de Totales Inferiores */
+        .totales-columna-row {
+            margin-top: 4px;
+            border-top: 1.5px dashed #dee2e6;
+            padding-top: 4px;
+        }
+
+        .total-col {
+            text-align: center;
+            font-size: 0.58rem;
+            font-weight: bold;
+            color: #495057;
+            background-color: #f1f3f5;
+            padding: 2px 1px;
+            border-radius: 3px;
+            line-height: 1.1;
+        }
+
+        .total-col.es-domingo {
+            color: #dc3545;
+            background-color: #fff5f5;
+        }
+
+        /* Panel Fijo Inferior */
+        .resumen-fijo {
+            width: 100%;
+            max-width: 450px;
+            background: #212529;
+            color: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        .resumen-grid-superior {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 4px;
+            text-align: center;
+        }
+
+        .resumen-item {
+            flex: 1;
+        }
+
+        .resumen-item text {
+            display: block;
+            font-size: 0.6rem;
+            color: #adb5bd;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .resumen-item span {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .resumen-item-input {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .resumen-item-input text {
+            font-size: 0.6rem;
+            color: #adb5bd;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .resumen-item-input input {
+            width: 80%;
+            padding: 3px 4px;
+            border-radius: 4px;
+            border: 1px solid #495057;
+            background-color: #343a40;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            font-size: 0.85rem;
+            outline: none;
+            -webkit-user-select: text; 
+            user-select: text;
+        }
+
+        /* Pantalla digital maestra unificada */
+        .panel-pantalla-final {
+            margin-top: 8px;
+            background-color: #1c1f22;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #2b3035;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sub-linea-tiempo {
+            font-size: 0.75rem;
+            color: #adb5bd;
+            margin-bottom: 2px;
+        }
+
+        #grand-total-tiempo {
+            color: #da77f2;
+            font-weight: bold;
+        }
+
+        .linea-pago-maestra {
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: #51cf66;
+            line-height: 1.1;
+        }
+
+        #copyright-indicator {
+            display: block;
+            text-align: center;
+            font-size: 0.58rem;
+            color: #868e96;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        /* Menu contextual Bottom Sheet */
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .bottom-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: white;
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
+            z-index: 1000;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            animation: slideIn 0.15s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .menu-opcion {
+            padding: 12px;
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .menu-opcion:active {
+            background-color: #f8f9fa;
+        }
+
+        .menu-opcion.cancelar {
+            color: #dc3545;
+            border-bottom: none;
+        }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "REEMPLAZAR_CON_TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO_ID",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        let db = null;
+        if (firebaseConfig.apiKey !== "REEMPLAZAR_CON_TU_API_KEY") {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+        }
+        window.dbFirebase = db;
+    </script>
+</head>
+<body>
+
+    <header>
+        <div class="app-subletra">Control de Asistencia</div>
+        <h1 class="empresa-titulo">IDA</h1>
+        <div class="navegador-meses">
+            <button class="btn-nav" onclick="cambiarMes(-1)">‹</button>
+            <div class="mes-titulo" id="nombre-mes-año">...</div>
+            <button class="btn-nav" onclick="cambiarMes(1)">›</button>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <div class="grid-7">
+            <div class="dia-semana">Lun</div>
+            <div class="dia-semana">Mar</div>
+            <div class="dia-semana">Mié</div>
+            <div class="dia-semana">Jue</div>
+            <div class="dia-semana">Vie</div>
+            <div class="dia-semana">Sáb</div>
+            <div class="dia-semana domingo-ui">Dom</div>
+        </div>
+
+        <div class="grid-7" id="calendar-grid" style="margin-top: 4px;"></div>
+
+        <div class="grid-7 totales-columna-row">
+            <div class="total-col" id="col-0">0d<br>0h</div>
+            <div class="total-col" id="col-1">0d<br>0h</div>
+            <div class="total-col" id="col-2">0d<br>0h</div>
+            <div class="total-col" id="col-3">0d<br>0h</div>
+            <div class="total-col" id="col-4">0d<br>0h</div>
+            <div class="total-col" id="col-5">0d<br>0h</div>
+            <div class="total-col es-domingo" id="col-6">0d<br>0h</div>
+        </div>
+    </div>
+
+    <div class="resumen-fijo">
+        <div class="resumen-grid-superior">
+            <div class="resumen-item">
+                <text>Días Trab.</text>
+                <span id="grand-total-dias">0</span>
+            </div>
+            <div class="resumen-item">
+                <text>Horas Ext.</text>
+                <span id="grand-total-horas">0</span>
+            </div>
+            <div class="resumen-item-input">
+                <text>Pago x Día</text>
+                <input type="number" id="pago-dia-input" value="0" min="0" placeholder="0">
+            </div>
+        </div>
+
+        <div class="panel-pantalla-final">
+            <div class="sub-linea-tiempo">
+                Tiempo Final: <span id="grand-total-tiempo">0 días</span>
+            </div>
+            <div class="linea-pago-maestra">
+                <span id="grand-total-pago">$0.00</span>
+            </div>
+        </div>
+
+        <span id="copyright-indicator">© 2026 DanielReal - Todos los derechos reservados</span>
+    </div>
+
+    <div class="menu-overlay" id="menuOverlay" onclick="cerrarMenu()"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+        <div class="menu-opcion" onclick="ejecutarAccion('editar')">✏️ Editar Clics</div>
+        <div class="menu-opcion" onclick="ejecutarAccion('feriado')">🎉 Marcar Feriado</div>
+        <div class="menu-opcion" onclick="ejecutarAccion('borrar')">🗑️ Limpiar Día</div>
+        <div class="menu-opcion cancelar" onclick="cerrarMenu()">❌ Cancelar</div>
+    </div>
+
+<script>
+    const gridContenedor = document.getElementById('calendar-grid');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const bottomSheet = document.getElementById('bottomSheet');
+    const pagoDiaInput = document.getElementById('pago-dia-input');
+
+    let celdaSeleccionada = null;
+    let timerPresion = null;
+    let esPresionLarga = false;
+    const TIEMPO_PRESION = 500; 
+
+    // Estado del tiempo real del dispositivo (Inmutable)
+    const fechaBaseHoy = new Date();
+    
+    // Estado dinámico del mes en vista
+    let añoSeleccionado = fechaBaseHoy.getFullYear();
+    let mesSeleccionado = fechaBaseHoy.getMonth();
+
+    const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    let storageID = "";
+    let baseDatosMes = {};
+
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    pagoDiaInput.addEventListener('input', () => {
+        localStorage.setItem('asistencia_config_pago_dia', pagoDiaInput.value);
+        calcularMatematica();
+    });
+
+    function cambiarMes(direccion) {
+        mesSeleccionado += direccion;
+        if (mesSeleccionado > 11) {
+            mesSeleccionado = 0;
+            añoSeleccionado++;
+        } else if (mesSeleccionado < 0) {
+            mesSeleccionado = 11;
+            añoSeleccionado--;
+        }
+        inicializarCalendario();
+    }
+    window.cambiarMes = cambiarMes;
+
+    function inicializarCalendario() {
+        document.getElementById('nombre-mes-año').textContent = `${mesesNombres[mesSeleccionado]} ${añoSeleccionado}`;
+        storageID = `asistencia_datos_${añoSeleccionado}_${mesSeleccionado}`;
+        
+        gridContenedor.innerHTML = "";
+        const totalDiasMes = new Date(añoSeleccionado, mesSeleccionado + 1, 0).getDate();
+        let primerDiaIndex = new Date(añoSeleccionado, mesSeleccionado, 1).getDay();
+        primerDiaIndex = (primerDiaIndex === 0) ? 6 : primerDiaIndex - 1;
+
+        for (let s = 0; s < primerDiaIndex; s++) {
+            const divVacio = document.createElement('div');
+            divVacio.classList.add('cell-vacia');
+            gridContenedor.appendChild(divVacio);
+        }
+
+        for (let dia = 1; dia <= totalDiasMes; dia++) {
+            const celda = document.createElement('div');
+            celda.classList.add('cell-dia');
+            celda.dataset.dia = dia;
+            const columnaDia = (primerDiaIndex + dia - 1) % 7;
+            celda.dataset.columna = columnaDia;
+
+            if (columnaDia === 6) {
+                celda.classList.add('es-domingo');
+                celda.dataset.isDomingo = "true";
+            }
+            
+            // Evalúa si es estrictamente el día de HOY real
+            if (dia === fechaBaseHoy.getDate() && mesSeleccionado === fechaBaseHoy.getMonth() && añoSeleccionado === fechaBaseHoy.getFullYear()) {
+                celda.classList.add('es-hoy');
+            }
+
+            celda.innerHTML = `
+                <div class="num-dia">${dia}</div>
+                <div class="marcador-celda" id="mark-${dia}"></div>
+            `;
+            celda.dataset.clics = "0";
+
+            celda.addEventListener('touchstart', (e) => disparoPresion(e, celda), {passive: true});
+            celda.addEventListener('touchend', (e) => disparoLevante(e, celda));
+            celda.addEventListener('mousedown', (e) => disparoPresion(e, celda));
+            celda.addEventListener('mouseup', (e) => disparoLevante(e, celda));
+            celda.addEventListener('touchmove', abortarPresion);
+            celda.addEventListener('mouseleave', abortarPresion);
+
+            gridContenedor.appendChild(celda);
+        }
+
+        const sueldoGuardado = localStorage.getItem('asistencia_config_pago_dia');
+        if (sueldoGuardado) pagoDiaInput.value = sueldoGuardado;
+
+        cargarDatosGuardados();
+    }
+
+    function disparoPresion(e, celda) {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        esPresionLarga = false;
+        timerPresion = setTimeout(() => {
+            esPresionLarga = true;
+            abrirMenu(celda);
+        }, TIEMPO_PRESION);
+    }
+
+    function disparoLevante(e, celda) {
+        clearTimeout(timerPresion);
+        if (!esPresionLarga) {
+            // VERIFICACIÓN ESTRICTA: El clic rápido solo funciona si coincide con el HOY real
+            const esHoyReal = (parseInt(celda.dataset.dia) === fechaBaseHoy.getDate() && 
+                               mesSeleccionado === fechaBaseHoy.getMonth() && 
+                               añoSeleccionado === fechaBaseHoy.getFullYear());
+            
+            if (!esHoyReal) return; // Si no es hoy, el cuadro está 100% BLOQUEADO para clics rápidos
+
+            let clics = parseInt(celda.dataset.clics) || 0;
+            clics++;
+            celda.dataset.clics = clics;
+            actualizarGraficoCelda(celda);
+            calcularMatematica();
+        }
+    }
+
+    function abortarPresion() {
+        clearTimeout(timerPresion);
+    }
+
+    function actualizarGraficoCelda(celda) {
+        const clics = parseInt(celda.dataset.clics) || 0;
+        const contenedorTexto = celda.querySelector('.marcador-celda');
+        if (clics === 0) contenedorTexto.textContent = "";
+        else if (clics === 1) contenedorTexto.textContent = "X";
+        else contenedorTexto.textContent = `x${clics - 1}`;
+    }
+
+    function abrirMenu(celda) {
+        celdaSeleccionada = celda;
+        menuOverlay.style.display = 'block';
+        bottomSheet.style.display = 'block';
+    }
+
+    function cerrarMenu() {
+        menuOverlay.style.display = 'none';
+        bottomSheet.style.display = 'none';
+    }
+
+    function ejecutarAccion(tipo) {
+        cerrarMenu();
+        if (!celdaSeleccionada) return;
+
+        if (tipo === 'borrar') {
+            celdaSeleccionada.dataset.clics = "0";
+            celdaSeleccionada.classList.remove('es-feriado');
+        } else if (tipo === 'feriado') {
+            celdaSeleccionada.classList.toggle('es-feriado');
+        } else if (tipo === 'editar') {
+            let actual = celdaSeleccionada.dataset.clics;
+            let respuesta = prompt("Modificar clics (0=Vacío, 1=X, 2=x1, 3=x2...):", actual);
+            if (respuesta !== null && !isNaN(parseInt(respuesta))) {
+                celdaSeleccionada.dataset.clics = Math.max(0, parseInt(respuesta));
+            }
+        }
+        actualizarGraficoCelda(celdaSeleccionada);
+        calcularMatematica();
+    }
+
+    function calcularMatematica() {
+        const celdasReales = document.querySelectorAll('.cell-dia');
+        let diasPorColumna = [0,0,0,0,0,0,0], horasPorColumna = [0,0,0,0,0,0,0];
+        let granTotalDias = 0, granTotalHoras = 0;
+        let paqueteParaGuardar = {};
+
+        celdasReales.forEach(celda => {
+            const dia = celda.dataset.dia;
+            const col = parseInt(celda.dataset.columna);
+            const clics = parseInt(celda.dataset.clics) || 0;
+            const esDomingo = celda.dataset.isDomingo === "true";
+            const esFeriado = celda.classList.contains('es-feriado');
+
+            paqueteParaGuardar[dia] = { clics, feriado: esFeriado };
+            if (clics === 0) return;
+
+            let diasCalculados = 1, horasCalculadas = clics > 1 ? clics - 1 : 0;
+            
+            if (esDomingo || esFeriado) { 
+                diasCalculados *= 2; 
+                horasCalculadas *= 2; 
+            }
+
+            diasPorColumna[col] += diasCalculados;
+            horasPorColumna[col] += horasCalculadas;
+            granTotalDias += diasCalculados;
+            granTotalHoras += horasCalculadas;
+        });
+
+        for (let c = 0; c < 7; c++) {
+            document.getElementById(`col-${c}`).innerHTML = `${diasPorColumna[c]}d<br>${horasPorColumna[c]}h`;
+        }
+
+        document.getElementById('grand-total-dias').textContent = granTotalDias;
+        document.getElementById('grand-total-horas').textContent = granTotalHoras;
+
+        let diasDeHoras = Math.floor(granTotalHoras / 8);
+        let horasSobrantes = granTotalHoras % 8;
+        let totalDiasCombinados = granTotalDias + diasDeHoras;
+        let textoTotalFinal = "";
+
+        if (totalDiasCombinados > 0 && horasSobrantes > 0) {
+            textoTotalFinal = `${totalDiasCombinados} d y ${horasSobrantes} h`;
+        } else if (totalDiasCombinados > 0) {
+            textoTotalFinal = `${totalDiasCombinados} días`;
+        } else if (horasSobrantes > 0) {
+            textoTotalFinal = `${horasSobrantes} horas`;
+        } else {
+            textoTotalFinal = "0 días";
+        }
+        document.getElementById('grand-total-tiempo').textContent = textoTotalFinal;
+
+        let pagoPorDia = parseFloat(pagoDiaInput.value) || 0;
+        let montoTotalDinero = (granTotalDias * pagoPorDia) + (granTotalHoras * (pagoPorDia / 8));
+
+        document.getElementById('grand-total-pago').textContent = "$" + montoTotalDinero.toLocaleString('es-DO', {
+            minimumFractionDigits: 2, maxFractionDigits: 2
+        });
+
+        baseDatosMes = paqueteParaGuardar;
+        
+        // GUARDADO AUTOMÁTICO INMEDIATO EN EL TELÉFONO
+        localStorage.setItem(storageID, JSON.stringify(baseDatosMes));
+        
+        // RESPALDO EN LA NUBE (SI ESTÁ CONFIGURADO)
+        if (window.dbFirebase) {
+            setDoc(doc(window.dbFirebase, "asistencias", storageID), baseDatosMes).catch(() => {});
+        }
+    }
+
+    async function cargarDatosGuardados() {
+        const locales = localStorage.getItem(storageID);
+        if (locales) inyectarEstructura(JSON.parse(locales));
+
+        if (window.dbFirebase) {
+            try {
+                const docSnap = await getDoc(doc(window.dbFirebase, "asistencias", storageID));
+                if (docSnap.exists()) inyectarEstructura(docSnap.data());
+            } catch (e) {}
+        }
+    }
+
+    function inyectarEstructura(datos) {
+        if (!datos) return;
+        
+        // Limpieza de estados visuales antes de inyectar el mes seleccionado
+        const celdasReales = document.querySelectorAll('.cell-dia');
+        celdasReales.forEach(c => {
+            c.dataset.clics = "0";
+            c.classList.remove('es-feriado');
+            actualizarGraficoCelda(c);
+        });
+
+        Object.keys(datos).forEach(dia => {
+            const celda = document.querySelector(`.cell-dia[data-dia="${dia}"]`);
+            if (celda) {
+                celda.dataset.clics = datos[dia].clics || 0;
+                if (datos[dia].feriado) celda.classList.add('es-feriado');
+                else celda.classList.remove('es-feriado');
+                actualizarGraficoCelda(celda);
+            }
+        });
+        calcularMatematica();
+    }
+
+    window.addEventListener('DOMContentLoaded', inicializarCalendario);
+</script>
+</body>
+</html>
