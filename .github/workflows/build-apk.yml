@@ -15,11 +15,11 @@ jobs:
       - name: Descargar Código Fuente
         uses: actions/checkout@v4
 
-      # 2. Configurar Node.js para Capacitor
+      # 2. Configurar Node.js para Capacitor (Actualizado a v22)
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # 3. Instalar las dependencias del proyecto
       - name: Instalar Dependencias de Node
