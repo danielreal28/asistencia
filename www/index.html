@@ -565,7 +565,13 @@
     }
 
     function disparoPresion(e, celda) {
-        if (e.type === 'mousedown' && e.button !== 0) return;
+        if (e.type === 'touchstart') {
+            celda.dataset.isTouch = "true";
+        } else if (e.type === 'mousedown') {
+            if (celda.dataset.isTouch === "true") return;
+            if (e.button !== 0) return; 
+        }
+
         esPresionLarga = false;
         timerPresion = setTimeout(() => {
             esPresionLarga = true;
@@ -574,20 +580,32 @@
     }
 
     function disparoLevante(e, celda) {
+        if (e.type === 'touchend') {
+            e.preventDefault(); // Detiene la simulación del clic fantasma en pantallas táctiles
+        } else if (e.type === 'mouseup' && celda.dataset.isTouch === "true") {
+            celda.dataset.isTouch = "false";
+            return;
+        }
+
         clearTimeout(timerPresion);
+        
         if (!esPresionLarga) {
             // VERIFICACIÓN ESTRICTA: El clic rápido solo funciona si coincide con el HOY real
             const esHoyReal = (parseInt(celda.dataset.dia) === fechaBaseHoy.getDate() && 
                                mesSeleccionado === fechaBaseHoy.getMonth() && 
                                añoSeleccionado === fechaBaseHoy.getFullYear());
             
-            if (!esHoyReal) return; // Si no es hoy, el cuadro está 100% BLOQUEADO para clics rápidos
+            if (!esHoyReal) return; 
 
             let clics = parseInt(celda.dataset.clics) || 0;
             clics++;
             celda.dataset.clics = clics;
             actualizarGraficoCelda(celda);
             calcularMatematica();
+        }
+        
+        if (e.type === 'touchend') {
+            setTimeout(() => { celda.dataset.isTouch = "false"; }, 100);
         }
     }
 
@@ -695,10 +713,10 @@
 
         baseDatosMes = paqueteParaGuardar;
         
-        // GUARDADO AUTOMÁTICO INMEDIATO EN EL TELÉFONO
+        // Guardado automático local
         localStorage.setItem(storageID, JSON.stringify(baseDatosMes));
         
-        // RESPALDO EN LA NUBE (SI ESTÁ CONFIGURADO)
+        // Respaldo en la nube si está activo
         if (window.dbFirebase) {
             setDoc(doc(window.dbFirebase, "asistencias", storageID), baseDatosMes).catch(() => {});
         }
@@ -719,7 +737,6 @@
     function inyectarEstructura(datos) {
         if (!datos) return;
         
-        // Limpieza de estados visuales antes de inyectar el mes seleccionado
         const celdasReales = document.querySelectorAll('.cell-dia');
         celdasReales.forEach(c => {
             c.dataset.clics = "0";
